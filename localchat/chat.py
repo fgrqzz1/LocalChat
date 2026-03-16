@@ -16,6 +16,7 @@ class ChatServer:
     def __init__(self) -> None:
         self.active_clients: Set[WebSocketServerProtocol] = set()
         self.client_info: Dict[WebSocketServerProtocol, Dict[str, str]] = {}
+        self.usernames: Dict[WebSocketServerProtocol, str] = {}
         self.history = []
 
     async def register(self, ws: WebSocketServerProtocol) -> None:
@@ -24,6 +25,7 @@ class ChatServer:
 
     async def unregister(self, ws: WebSocketServerProtocol) -> None:
         self.active_clients.discard(ws)
+        self.usernames.pop(ws, None)
         info = self.client_info.pop(ws, None)
         if info:
             await self.broadcast_system(f"{info['nickname']} вышел из чата")
@@ -101,6 +103,70 @@ class ChatServer:
 
             msg_type = data.get("type")
             payload = data.get("payload", {})
+
+            if msg_type == "register":
+                # Поддерживаем оба формата:
+                # {"type": "register", "username": "..."} (шаг 2 ТЗ)
+                # и {"type": "register", "payload": {"username": "..."}} (внутренний)
+                raw_username = data.get("username")
+                if raw_username is None:
+                    raw_username = payload.get("username", "")
+                username = str(raw_username).strip()
+                if not username:
+                    await self._safe_send(
+                        ws,
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Имя пользователя не может быть пустым",
+                            }
+                        ),
+                    )
+                    continue
+
+                if len(username) > 20:
+                    await self._safe_send(
+                        ws,
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Имя пользователя не должно превышать 20 символов",
+                            }
+                        ),
+                    )
+                    continue
+
+                if username in self.usernames.values():
+                    await self._safe_send(
+                        ws,
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Это имя уже занято другим участником",
+                            }
+                        ),
+                    )
+                    continue
+
+                self.usernames[ws] = username
+
+                user_id = str(uuid.uuid4())
+                self.client_info[ws] = {"user_id": user_id, "nickname": username}
+                hello_received = True
+
+                await self.send_history(ws)
+                await self.broadcast_system(f"{username} присоединился к чату")
+                await self.broadcast_users()
+
+                await self._safe_send(
+                    ws,
+                    json.dumps(
+                        {
+                            "type": "registered",
+                        }
+                    ),
+                )
+                continue
 
             if msg_type == "hello":
                 nickname = str(payload.get("nickname", "")).strip()

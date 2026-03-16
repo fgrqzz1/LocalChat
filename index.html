@@ -745,6 +745,7 @@
       let userId = null;
       let reconnectTimer = null;
       let historyLoaded = false;
+      let isRegistered = false;
 
       const messagesEl = document.getElementById("messages");
       const messageInputEl = document.getElementById("messageInput");
@@ -765,7 +766,7 @@
       function setStatus(connected, text) {
         statusDotEl.classList.toggle("online", connected);
         statusTextEl.textContent = text;
-        sendButtonEl.disabled = !connected || !messageInputEl.value.trim();
+        sendButtonEl.disabled = !connected || !isRegistered || !messageInputEl.value.trim();
       }
 
       function scrollMessagesToBottom() {
@@ -905,15 +906,14 @@
         setStatus(false, "Подключаемся…");
 
         ws.addEventListener("open", () => {
-          setStatus(true, "Онлайн");
           historyLoaded = false;
-          userHintEl.textContent = nickname ? "Вы: " + nickname : "";
+          isRegistered = false;
 
-          const helloMsg = {
-            type: "hello",
-            payload: { nickname: nickname },
+          const registerMsg = {
+            type: "register",
+            username: nickname,
           };
-          ws.send(JSON.stringify(helloMsg));
+          ws.send(JSON.stringify(registerMsg));
         });
 
         ws.addEventListener("message", (event) => {
@@ -927,6 +927,14 @@
 
           const type = data.type;
           const payload = data.payload || {};
+
+          if (type === "registered") {
+            isRegistered = true;
+            setStatus(true, "Онлайн");
+            userHintEl.textContent = nickname ? "Вы: " + nickname : "";
+            nickModalEl.style.display = "none";
+            return;
+          }
 
           if (type === "history") {
             const messages = payload.messages || [];
@@ -986,7 +994,7 @@
 
       function sendMessage() {
         const text = messageInputEl.value.trim();
-        if (!text || !ws || ws.readyState !== WebSocket.OPEN) {
+        if (!text || !ws || ws.readyState !== WebSocket.OPEN || !isRegistered) {
           return;
         }
 
@@ -1011,7 +1019,7 @@
 
       messageInputEl.addEventListener("input", () => {
         const value = messageInputEl.value.trim();
-        sendButtonEl.disabled = !value || !ws || ws.readyState !== WebSocket.OPEN;
+        sendButtonEl.disabled = !value || !ws || ws.readyState !== WebSocket.OPEN || !isRegistered;
       });
 
       sendButtonEl.addEventListener("click", () => {

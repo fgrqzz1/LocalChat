@@ -1,19 +1,15 @@
-"""Application wiring: HTTP + WebSocket servers."""
+"""Application wiring: WebSocket server."""
 
-import asyncio
 import logging
 
 import websockets
 
 from . import config
 from .chat import ChatServer
-from .http_server import start_http_server
 
 
 async def main() -> None:
     chat_server = ChatServer()
-
-    http_server = await start_http_server()
 
     ws_server = await websockets.serve(
         chat_server.handler,
@@ -31,6 +27,6 @@ async def main() -> None:
         config.WS_PATH,
     )
 
-    async with http_server, ws_server:
-        await asyncio.gather(http_server.serve_forever(), ws_server.wait_closed())
+    async with ws_server:
+        await ws_server.wait_closed()
 

@@ -1,80 +1,27 @@
-"""Async HTTP server that serves index.html."""
+"""HTTP server that serves index.html using the standard library."""
 
-import asyncio
 import logging
-from asyncio import StreamReader, StreamWriter
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 from . import config
 
 
-try:
-    with open("index.html", "rb") as f:
-        INDEX_HTML_BYTES = f.read()
-except OSError:
-    INDEX_HTML_BYTES = b"<html><body><h1>index.html not found</h1></body></html>"
+class IndexHandler(SimpleHTTPRequestHandler):
+    """Serve index.html on / and /index.html."""
+
+    def do_GET(self) -> None:  # type: ignore[override]
+        if self.path in ("/", "/index.html"):
+            self.path = "/index.html"
+        return super().do_GET()
+
+    def log_message(self, format: str, *args) -> None:  # noqa: A003
+        logging.info("HTTP: " + format, *args)
 
 
-async def http_handler(reader: StreamReader, writer: StreamWriter) -> None:
-    try:
-        request_line = await reader.readline()
-        if not request_line:
-            writer.close()
-            await writer.wait_closed()
-            return
-
-        parts = request_line.decode("latin1").strip().split()
-        if len(parts) < 2:
-            writer.close()
-            await writer.wait_closed()
-            return
-
-        method, path = parts[0], parts[1]
-
-        # Читаем и игнорируем заголовки до пустой строки
-        while True:
-            header_line = await reader.readline()
-            if not header_line or header_line in (b"\r\n", b"\n"):
-                break
-
-        if method != "GET" or path != "/":
-            response_body = b"Not found"
-            response = (
-                b"HTTP/1.1 404 Not Found\r\n"
-                b"Content-Type: text/plain; charset=utf-8\r\n"
-                b"Content-Length: " + str(len(response_body)).encode("ascii") + b"\r\n"
-                b"Connection: close\r\n"
-                b"\r\n"
-                + response_body
-            )
-            writer.write(response)
-            await writer.drain()
-            writer.close()
-            await writer.wait_closed()
-            return
-
-        body = INDEX_HTML_BYTES
-        response = (
-            b"HTTP/1.1 200 OK\r\n"
-            b"Content-Type: text/html; charset=utf-8\r\n"
-            b"Content-Length: " + str(len(body)).encode("ascii") + b"\r\n"
-            b"Connection: close\r\n"
-            b"\r\n"
-            + body
-        )
-        writer.write(response)
-        await writer.drain()
-    except Exception as e:  # noqa: BLE001
-        logging.error("HTTP handler error: %s", e)
-    finally:
-        try:
-            writer.close()
-            await writer.wait_closed()
-        except Exception:
-            pass
-
-
-async def start_http_server() -> asyncio.AbstractServer:
-    server = await asyncio.start_server(http_handler, config.HTTP_HOST, config.HTTP_PORT)
+def start_http_server() -> None:
+    """Run blocking HTTP server in current thread."""
+    httpd = HTTPServer((config.HTTP_HOST, config.HTTP_PORT), IndexHandler)
     logging.info("HTTP server listening on %s:%d", config.HTTP_HOST, config.HTTP_PORT)
-    return server
+    httpd.serve_forever()
+
 
