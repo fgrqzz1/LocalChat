@@ -1,0 +1,29 @@
+name: LocalChatIOS
+options:
+  minimumXcodeGenVersion: 2.38.0
+targets:
+  LocalChatIOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: .
+        excludes:
+          - project.yml
+          - README.md
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.localchat.ios
+        SWIFT_VERSION: 5.0
+        INFOPLIST_KEY_CFBundleDisplayName: LocalChat
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: LocalChat needs access to your local network to connect to the chat server.
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        GENERATE_INFOPLIST_FILE: YES
