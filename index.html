@@ -218,11 +218,14 @@
       cursor: grab;
       transform: translateY(0);
       touch-action: none;
+      transition: transform 0.14s ease-out, height 0.14s ease-out, filter 0.14s ease-out;
+      will-change: transform;
     }
 
     .chat-scroll-thumb.dragging {
       cursor: grabbing;
       filter: brightness(1.06);
+      transition: none;
     }
 
     .message-group {
@@ -856,7 +859,7 @@
         chatScrollThumbEl.style.transform = "translateY(" + thumbTop + "px)";
       }
 
-      function scrollByScrollbarPosition(clientY, dragOffsetY) {
+      function scrollByScrollbarPosition(clientY, dragOffsetY, smooth) {
         const rect = chatScrollbarEl.getBoundingClientRect();
         const trackHeight = chatScrollbarEl.clientHeight;
         const thumbHeight = chatScrollThumbEl.clientHeight;
@@ -866,7 +869,12 @@
         const relativeY = clientY - rect.top - dragOffsetY;
         const thumbTop = Math.max(0, Math.min(maxThumbTop, relativeY));
         const ratio = thumbTop / maxThumbTop;
-        messagesEl.scrollTop = ratio * maxScroll;
+        const targetScrollTop = ratio * maxScroll;
+        if (smooth) {
+          messagesEl.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+        } else {
+          messagesEl.scrollTop = targetScrollTop;
+        }
         updateChatScrollThumb();
       }
 
@@ -945,7 +953,7 @@
 
       window.addEventListener("pointermove", (event) => {
         if (!draggingThumb) return;
-        scrollByScrollbarPosition(event.clientY, thumbDragOffsetY);
+        scrollByScrollbarPosition(event.clientY, thumbDragOffsetY, false);
       });
 
       window.addEventListener("pointerup", () => {
@@ -957,7 +965,7 @@
       chatScrollbarEl.addEventListener("click", (event) => {
         if (event.target === chatScrollThumbEl) return;
         const thumbHalf = chatScrollThumbEl.clientHeight / 2;
-        scrollByScrollbarPosition(event.clientY, thumbHalf);
+        scrollByScrollbarPosition(event.clientY, thumbHalf, true);
       });
 
       messagesEl.addEventListener("scroll", updateChatScrollThumb);
